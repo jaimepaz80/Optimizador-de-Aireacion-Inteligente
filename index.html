@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Optimizador de Aireación v3.0 (Híbrido)</title>
+    <title>Optimizador de Aireación v5.0 (Adaptativa)</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f4f8; color: #333; display: flex; justify-content: center; align-items: flex-start; padding: 20px; gap: 20px; }
         .container { display: flex; flex-wrap: wrap; gap: 30px; width: 100%; max-width: 1200px; }
@@ -16,9 +16,8 @@
         input[type="number"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 1em; }
         button { width: 100%; padding: 12px; background-color: #0a9396; color: white; border: none; border-radius: 4px; font-size: 1.1em; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
         button:hover { background-color: #005f73; }
-        #pool-container { position: relative; background-color: #e0f7fa; border: 2px solid #0077b6; margin-top: 20px; overflow: hidden; transition: all 0.5s; }
-        .aerator { position: absolute; width: 20px; height: 20px; background-color: #ee9b00; border: 1px solid #9b2226; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; cursor: pointer; transform: translate(-50%, -50%); }
-        .aerator .arrow { color: #9b2226; }
+        #pool-container { position: relative; background-color: #e0f7fa; border: 2px solid #0077b6; margin-top: 20px; overflow: hidden; display: grid; }
+        .aerator { background-color: #ee9b00; border: 1px solid #9b2226; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; width: 60%; height: 60%; margin: auto; }
         #summary ul { list-style: none; padding: 0; }
         #summary li { background-color: #f8f9fa; border-left: 4px solid #0a9396; padding: 10px; margin-bottom: 8px; }
         .strategy-title { color: #d90429; font-weight: bold; }
@@ -27,7 +26,7 @@
 <body>
     <div class="container">
         <div class="panel config-panel">
-            <h1>Optimizador de Aireación 🦐 v3.0</h1>
+            <h1>Optimizador de Aireación 🦐 v5.0</h1>
             <div id="config-form">
                 <div class="form-group"><label for="length">Largo (mts):</label><input type="number" id="length" value="400"></div>
                 <div class="form-group"><label for="width">Ancho (mts):</label><input type="number" id="width" value="100"></div>
@@ -45,139 +44,95 @@
 
     <script>
         function calculate() {
+            // 1. OBTENER DATOS
             const length = parseFloat(document.getElementById('length').value);
             const width = parseFloat(document.getElementById('width').value);
             const biomass = parseFloat(document.getElementById('biomass').value);
             const hpPerAerator = parseFloat(document.getElementById('hp').value);
 
-            if (isNaN(length) || isNaN(width) || isNaN(biomass) || isNaN(hpPerAerator) || length <= 0 || width <= 0) {
-                alert("Por favor, introduce valores válidos y positivos."); return;
+            if (isNaN(length) || isNaN(width) || biomass < 0 || hpPerAerator <= 0) {
+                alert("Por favor, introduce valores válidos."); return;
             }
 
+            // --- LÓGICA V5.0 ---
             const KG_PER_HP = 180;
+
+            // 2. CÁLCULO DE N° DE AIREADORES EXCLUSIVAMENTE POR BIOMASA
             const totalHpNeeded = biomass / KG_PER_HP;
-            const numAerators = Math.ceil(totalHpNeeded / hpPerAerator);
+            const numAeratorsRaw = Math.ceil(totalHpNeeded / hpPerAerator);
+
+            // 3. AJUSTE A NÚMERO PAR SUPERIOR
+            const finalNumAerators = (numAeratorsRaw % 2 !== 0) ? numAeratorsRaw + 1 : numAeratorsRaw;
             
-            const area = length * width;
+            // 4. ENCONTRAR LA MEJOR CUADRÍCULA (filas x columnas)
+            const grid = findBestGrid(finalNumAerators, width, length);
+            const rows = grid.rows;
+            const cols = grid.cols;
+
+            // 5. VISUALIZACIÓN
             const poolContainer = document.getElementById('pool-container');
-            const summaryDiv = document.getElementById('summary');
             poolContainer.innerHTML = '';
+            
+            poolContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+            poolContainer.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+            
+            const aspectRatio = width / length;
+            const containerWidth = poolContainer.parentElement.clientWidth - 40;
+            poolContainer.style.width = `${containerWidth}px`;
+            poolContainer.style.height = `${containerWidth * aspectRatio}px`;
 
-            const long_side = Math.max(length, width);
-            const short_side = Math.min(length, width);
-            const aspect_ratio = long_side / short_side;
-
-            let strategy_name = "";
-
-            // --- LÓGICA V3.0: SELECCIÓN DE ESTRATEGIA ---
-            if (aspect_ratio > 1.3) {
-                if (long_side > 150 && numAerators >= 4) {
-                    strategy_name = "Rectangular Grande: Racetrack Asistido";
-                    strategy_Rectangular_Large(length, width, numAerators);
-                } else {
-                    strategy_name = "Rectangular: Racetrack Clásico";
-                    strategy_Rectangular_Classic(length, width, numAerators);
-                }
-            } else {
-                strategy_name = "Cuadrada: Vórtice Circular";
-                strategy_Square_Vortex(length, width, numAerators);
+            for (let i = 0; i < finalNumAerators; i++) {
+                const aerator = document.createElement('div');
+                aerator.className = 'aerator';
+                poolContainer.appendChild(aerator);
             }
             
-            drawPool(length, width);
-            
+            // 6. MOSTRAR RESUMEN
+            const areaPerAerator = (length * width) / finalNumAerators;
+            const summaryDiv = document.getElementById('summary');
             summaryDiv.innerHTML = `
-                <h2>Resumen Técnico (v3.0)</h2>
+                <h2>Resumen Técnico (v5.0)</h2>
                 <ul>
-                    <li><span class="strategy-title">Estrategia Aplicada:</span> ${strategy_name}</li>
-                    <li><strong>Área de la Piscina:</strong> ${area.toFixed(2)} m²</li>
-                    <li><strong>HP Totales Recomendados:</strong> ${totalHpNeeded.toFixed(2)} HP</li>
-                    <li><strong>N° de Aireadores de ${hpPerAerator} HP:</strong> ${numAerators} unidades</li>
+                    <li><span class="strategy-title">Estrategia Aplicada:</span> Cuadrícula Adaptativa</li>
+                    <li><strong>Cálculo por Biomasa:</strong> ${numAeratorsRaw} aireadores</li>
+                    <li style="font-weight: bold; background-color: #e0f7fa;"><strong>Ajuste a Par Superior:</strong> ${finalNumAerators} aireadores</li>
+                    <li><strong>Distribución en Cuadrícula:</strong> ${rows} filas x ${cols} columnas</li>
+                    <li><strong>Área de cobertura por aireador:</strong> ${areaPerAerator.toFixed(2)} m²</li>
                 </ul>
             `;
         }
-        
-        function strategy_Rectangular_Large(l, w, total) {
-            const aerators_on_long_sides = total - 2;
-            const side1_count = Math.ceil(aerators_on_long_sides / 2);
-            const side2_count = Math.floor(aerators_on_long_sides / 2);
 
-            // Aireadores en lados largos
-            placeAeratorsOnSide(side1_count, 'long', 'a', l, w);
-            placeAeratorsOnSide(side2_count, 'long', 'b', l, w);
-            // Aireadores en lados cortos para asistir
-            placeAeratorsOnSide(1, 'short', 'a', l, w);
-            placeAeratorsOnSide(1, 'short', 'b', l, w);
-        }
+        function findBestGrid(targetCount, poolW, poolL) {
+            let bestGrid = { rows: 1, cols: targetCount };
+            let minRatioDiff = Infinity;
 
-        function strategy_Rectangular_Classic(l, w, total) {
-            const side1_count = Math.ceil(total / 2);
-            const side2_count = Math.floor(total / 2);
-            placeAeratorsOnSide(side1_count, 'long', 'a', l, w);
-            placeAeratorsOnSide(side2_count, 'long', 'b', l, w);
-        }
+            for (let i = 1; i <= Math.sqrt(targetCount); i++) {
+                if (targetCount % i === 0) {
+                    const j = targetCount / i;
+                    // Probar combinación 1: (i rows, j cols)
+                    let cellW1 = poolL / j;
+                    let cellH1 = poolW / i;
+                    let ratio1 = cellW1 / cellH1;
+                    let diff1 = Math.abs(1 - ratio1);
 
-        function strategy_Square_Vortex(l, w, total) {
-            const per_side = Math.floor(total / 4);
-            let remainder = total % 4;
-            
-            const sides = [per_side, per_side, per_side, per_side];
-            for (let i = 0; i < remainder; i++) sides[i]++;
+                    if (diff1 < minRatioDiff) {
+                        minRatioDiff = diff1;
+                        bestGrid = { rows: i, cols: j };
+                    }
+                    
+                    // Probar combinación 2: (j rows, i cols)
+                    let cellW2 = poolL / i;
+                    let cellH2 = poolW / j;
+                    let ratio2 = cellW2 / cellH2;
+                    let diff2 = Math.abs(1 - ratio2);
 
-            placeAeratorsOnSide(sides[0], 'top', 'vortex', l, w);
-            placeAeratorsOnSide(sides[1], 'right', 'vortex', l, w);
-            placeAeratorsOnSide(sides[2], 'bottom', 'vortex', l, w);
-            placeAeratorsOnSide(sides[3], 'left', 'vortex', l, w);
-        }
-
-        function placeAeratorsOnSide(count, side, type, l, w) {
-            if (count === 0) return;
-            const margin_percent = 0.15;
-
-            for (let i = 0; i < count; i++) {
-                let top=0, left=0, arrow = '';
-                const pos = (i + 1) / (count + 1) * 100;
-                
-                if (side === 'long') { // Racetrack
-                    left = (type === 'a') ? (100 - margin_percent * 100) : (margin_percent * 100);
-                    top = pos;
-                    arrow = (type === 'a') ? '↑' : '↓';
-                } else if (side === 'short') { // Asistencia
-                    top = (type === 'a') ? (margin_percent * 100) : (100 - margin_percent * 100);
-                    left = pos;
-                    arrow = (type === 'a') ? '→' : '←';
-                } else { // Vortex
-                    const vortex_margin = 0.20 * 100;
-                    if (side === 'top') { top = vortex_margin; left = pos; arrow = '→'; }
-                    if (side === 'right') { left = 100 - vortex_margin; top = pos; arrow = '↓'; }
-                    if (side === 'bottom') { top = 100 - vortex_margin; left = pos; arrow = '←'; }
-                    if (side === 'left') { left = vortex_margin; top = pos; arrow = '↑'; }
+                    if (diff2 < minRatioDiff) {
+                        minRatioDiff = diff2;
+                        bestGrid = { rows: j, cols: i };
+                    }
                 }
-                createAerator(top, left, arrow);
             }
-        }
-
-        function createAerator(topPercent, leftPercent, arrow) {
-            const pool = document.getElementById('pool-container');
-            const aerator = document.createElement('div');
-            aerator.className = 'aerator';
-            aerator.style.top = `${topPercent}%`;
-            aerator.style.left = `${leftPercent}%`;
-            aerator.innerHTML = `<span class="arrow">${arrow}</span>`;
-            pool.appendChild(aerator);
-        }
-
-        function drawPool(length, width) {
-            const poolContainer = document.getElementById('pool-container');
-            const aspectRatio = width / length;
-            const containerWidth = poolContainer.parentElement.clientWidth - 40;
-            let displayWidth = containerWidth;
-            let displayHeight = displayWidth * aspectRatio;
-            if (displayHeight > 500) {
-                displayHeight = 500;
-                displayWidth = displayHeight / aspectRatio;
-            }
-            poolContainer.style.width = `${displayWidth}px`;
-            poolContainer.style.height = `${displayHeight}px`;
+            return bestGrid;
         }
 
         window.onload = calculate;
