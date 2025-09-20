@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Optimizador de Aireación Inteligente</title>
+    <title>Optimizador de Aireación v2.0</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -17,6 +17,7 @@
         }
         .container {
             display: flex;
+            flex-wrap: wrap;
             gap: 30px;
             width: 100%;
             max-width: 1200px;
@@ -30,9 +31,11 @@
         .config-panel {
             flex-basis: 350px;
             flex-shrink: 0;
+            flex-grow: 1;
         }
         .results-panel {
-            flex-grow: 1;
+            flex-basis: 500px;
+            flex-grow: 2;
         }
         h1, h2 {
             color: #005f73;
@@ -140,19 +143,19 @@
             <div id="config-form">
                 <div class="form-group">
                     <label for="length">Largo de la Piscina (mts):</label>
-                    <input type="number" id="length" value="45">
+                    <input type="number" id="length" value="400">
                 </div>
                 <div class="form-group">
                     <label for="width">Ancho de la Piscina (mts):</label>
-                    <input type="number" id="width" value="20">
+                    <input type="number" id="width" value="100">
                 </div>
                 <div class="form-group">
                     <label for="biomass">Biomasa Máxima Esperada (kg):</label>
-                    <input type="number" id="biomass" value="3000">
+                    <input type="number" id="biomass" value="12000">
                 </div>
                 <div class="form-group">
                     <label for="hp">Potencia por Aireador (HP):</label>
-                    <input type="number" id="hp" value="2">
+                    <input type="number" id="hp" value="4">
                 </div>
                 <button onclick="calculate()">Calcular Distribución Óptima</button>
             </div>
@@ -180,20 +183,19 @@
                 return;
             }
 
-            // 2. LÓGICA DE CÁLCULO (EL "CEREBRO" EXPERTO)
-            const KG_PER_HP = 180; // Regla estándar: 1 HP puede soportar aprox. 180 kg de biomasa.
+            // 2. LÓGICA DE CÁLCULO
+            const KG_PER_HP = 180; 
             const totalHpNeeded = biomass / KG_PER_HP;
             const numAerators = Math.ceil(totalHpNeeded / hpPerAerator);
             
             const area = length * width;
             const poolContainer = document.getElementById('pool-container');
             const summaryDiv = document.getElementById('summary');
-            poolContainer.innerHTML = ''; // Limpiar resultados anteriores
+            poolContainer.innerHTML = ''; 
 
             // 3. LÓGICA DE DIBUJO Y POSICIONAMIENTO
-            // Escalar el dibujo para que quepa en la pantalla
             const aspectRatio = width / length;
-            const containerWidth = poolContainer.parentElement.clientWidth - 40; // Ancho del panel de resultados
+            const containerWidth = poolContainer.parentElement.clientWidth - 40;
             let displayWidth = containerWidth;
             let displayHeight = displayWidth * aspectRatio;
             
@@ -205,35 +207,38 @@
             poolContainer.style.width = `${displayWidth}px`;
             poolContainer.style.height = `${displayHeight}px`;
 
-            // Posicionamiento de aireadores para efecto "Racetrack"
             let side1Count = Math.ceil(numAerators / 2);
             let side2Count = Math.floor(numAerators / 2);
 
-            const marginFromShortWall = 0.15; // 15% del largo
-            const marginFromLongWall = 0.20;  // 20% del ancho
+            // ==================== CAMBIO CLAVE AQUÍ ====================
+            // Reducimos el margen para una mejor distribución en piscinas grandes.
+            const marginFromShortWall = 0.075; // ANTES ERA 0.15 (15%)
+            // ==========================================================
+
+            const marginFromLongWall = 0.20;
             
-            // Colocar aireadores en el lado 1 (derecha, empujando hacia arriba)
+            // Colocar aireadores en el lado 1 (derecha)
             for (let i = 0; i < side1Count; i++) {
-                const topPercent = (1 - marginFromShortWall) * 100 * (i + 1) / (side1Count + 1) + (marginFromShortWall * 50);
+                // Se usa una fórmula más simple para distribuir uniformemente en el espacio disponible
+                const topPercent = (100 * (1 - 2 * marginFromShortWall) * (i + 0.5) / side1Count) + (100 * marginFromShortWall);
                 const leftPercent = 100 - (marginFromLongWall * 100);
                 createAerator(poolContainer, topPercent, leftPercent, i + 1);
             }
 
-            // Colocar aireadores en el lado 2 (izquierda, empujando hacia abajo)
+            // Colocar aireadores en el lado 2 (izquierda)
             for (let i = 0; i < side2Count; i++) {
-                const topPercent = (1 - marginFromShortWall) * 100 * (i + 1) / (side2Count + 1) + (marginFromShortWall * 50);
+                const topPercent = (100 * (1 - 2 * marginFromShortWall) * (i + 0.5) / side2Count) + (100 * marginFromShortWall);
                 const leftPercent = marginFromLongWall * 100;
                 createAerator(poolContainer, topPercent, leftPercent, side1Count + i + 1);
             }
             
-            // Añadir etiquetas de dimensiones
-            addLabel(poolContainer, `${length} mts`, '50%', '-20px', true);
+            addLabel(poolContainer, `${length} mts`, '50%', '-25px', true);
             addLabel(poolContainer, `${width} mts`, '-25px', '50%', false);
 
 
             // 4. MOSTRAR RESUMEN
             summaryDiv.innerHTML = `
-                <h2>Resumen Técnico</h2>
+                <h2>Resumen Técnico (v2.0)</h2>
                 <ul>
                     <li><strong>Área de la Piscina:</strong> ${area.toFixed(2)} m²</li>
                     <li><strong>HP Totales Recomendados:</strong> ${totalHpNeeded.toFixed(2)} HP</li>
@@ -252,7 +257,7 @@
                 ${number}
                 <span class="tooltip">
                     Dist. pared larga: ${(document.getElementById('width').value * 0.20).toFixed(1)}m<br>
-                    Dist. pared corta: variable
+                    Modelo v2.0
                 </span>
             `;
             container.appendChild(aerator);
@@ -272,9 +277,7 @@
             container.appendChild(label);
         }
 
-        // Ejecutar cálculo al cargar la página con valores iniciales
         window.onload = calculate;
-
     </script>
 
 </body>
