@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimizador de Aireación Inteligente</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 20px;
+            gap: 20px;
+        }
+        .container {
+            display: flex;
+            gap: 30px;
+            width: 100%;
+            max-width: 1200px;
+        }
+        .panel {
+            background-color: #fff;
+            padding: 25px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .config-panel {
+            flex-basis: 350px;
+            flex-shrink: 0;
+        }
+        .results-panel {
+            flex-grow: 1;
+        }
+        h1, h2 {
+            color: #005f73;
+            border-bottom: 2px solid #005f73;
+            padding-bottom: 10px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 1em;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #0a9396;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1.1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #005f73;
+        }
+        #pool-container {
+            position: relative;
+            background-color: #e0f7fa;
+            border: 2px solid #0077b6;
+            margin-top: 20px;
+            overflow: hidden;
+            transition: all 0.5s;
+        }
+        .aerator {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background-color: #ee9b00;
+            border: 1px solid #9b2226;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            cursor: pointer;
+            transform: translate(-50%, -50%);
+        }
+        .aerator .tooltip {
+            visibility: hidden;
+            width: 160px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px 0;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -80px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .aerator:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+        .dimension-label {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        #summary ul {
+            list-style: none;
+            padding: 0;
+        }
+        #summary li {
+            background-color: #f8f9fa;
+            border-left: 4px solid #0a9396;
+            padding: 10px;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="panel config-panel">
+            <h1>Optimizador de Aireación 🦐</h1>
+            <div id="config-form">
+                <div class="form-group">
+                    <label for="length">Largo de la Piscina (mts):</label>
+                    <input type="number" id="length" value="45">
+                </div>
+                <div class="form-group">
+                    <label for="width">Ancho de la Piscina (mts):</label>
+                    <input type="number" id="width" value="20">
+                </div>
+                <div class="form-group">
+                    <label for="biomass">Biomasa Máxima Esperada (kg):</label>
+                    <input type="number" id="biomass" value="3000">
+                </div>
+                <div class="form-group">
+                    <label for="hp">Potencia por Aireador (HP):</label>
+                    <input type="number" id="hp" value="2">
+                </div>
+                <button onclick="calculate()">Calcular Distribución Óptima</button>
+            </div>
+        </div>
+
+        <div class="panel results-panel">
+            <h2>Resultados de Simulación</h2>
+            <div id="pool-container"></div>
+            <div id="summary">
+                <p><em>Introduce los datos y presiona "Calcular" para ver la distribución recomendada.</em></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function calculate() {
+            // 1. OBTENER DATOS DE ENTRADA
+            const length = parseFloat(document.getElementById('length').value);
+            const width = parseFloat(document.getElementById('width').value);
+            const biomass = parseFloat(document.getElementById('biomass').value);
+            const hpPerAerator = parseFloat(document.getElementById('hp').value);
+
+            if (isNaN(length) || isNaN(width) || isNaN(biomass) || isNaN(hpPerAerator) || length <= 0 || width <= 0 || biomass <= 0 || hpPerAerator <= 0) {
+                alert("Por favor, introduce valores válidos y positivos en todos los campos.");
+                return;
+            }
+
+            // 2. LÓGICA DE CÁLCULO (EL "CEREBRO" EXPERTO)
+            const KG_PER_HP = 180; // Regla estándar: 1 HP puede soportar aprox. 180 kg de biomasa.
+            const totalHpNeeded = biomass / KG_PER_HP;
+            const numAerators = Math.ceil(totalHpNeeded / hpPerAerator);
+            
+            const area = length * width;
+            const poolContainer = document.getElementById('pool-container');
+            const summaryDiv = document.getElementById('summary');
+            poolContainer.innerHTML = ''; // Limpiar resultados anteriores
+
+            // 3. LÓGICA DE DIBUJO Y POSICIONAMIENTO
+            // Escalar el dibujo para que quepa en la pantalla
+            const aspectRatio = width / length;
+            const containerWidth = poolContainer.parentElement.clientWidth - 40; // Ancho del panel de resultados
+            let displayWidth = containerWidth;
+            let displayHeight = displayWidth * aspectRatio;
+            
+            if (displayHeight > 500) {
+                displayHeight = 500;
+                displayWidth = displayHeight / aspectRatio;
+            }
+
+            poolContainer.style.width = `${displayWidth}px`;
+            poolContainer.style.height = `${displayHeight}px`;
+
+            // Posicionamiento de aireadores para efecto "Racetrack"
+            let side1Count = Math.ceil(numAerators / 2);
+            let side2Count = Math.floor(numAerators / 2);
+
+            const marginFromShortWall = 0.15; // 15% del largo
+            const marginFromLongWall = 0.20;  // 20% del ancho
+            
+            // Colocar aireadores en el lado 1 (derecha, empujando hacia arriba)
+            for (let i = 0; i < side1Count; i++) {
+                const topPercent = (1 - marginFromShortWall) * 100 * (i + 1) / (side1Count + 1) + (marginFromShortWall * 50);
+                const leftPercent = 100 - (marginFromLongWall * 100);
+                createAerator(poolContainer, topPercent, leftPercent, i + 1);
+            }
+
+            // Colocar aireadores en el lado 2 (izquierda, empujando hacia abajo)
+            for (let i = 0; i < side2Count; i++) {
+                const topPercent = (1 - marginFromShortWall) * 100 * (i + 1) / (side2Count + 1) + (marginFromShortWall * 50);
+                const leftPercent = marginFromLongWall * 100;
+                createAerator(poolContainer, topPercent, leftPercent, side1Count + i + 1);
+            }
+            
+            // Añadir etiquetas de dimensiones
+            addLabel(poolContainer, `${length} mts`, '50%', '-20px', true);
+            addLabel(poolContainer, `${width} mts`, '-25px', '50%', false);
+
+
+            // 4. MOSTRAR RESUMEN
+            summaryDiv.innerHTML = `
+                <h2>Resumen Técnico</h2>
+                <ul>
+                    <li><strong>Área de la Piscina:</strong> ${area.toFixed(2)} m²</li>
+                    <li><strong>HP Totales Recomendados:</strong> ${totalHpNeeded.toFixed(2)} HP</li>
+                    <li><strong>N° de Aireadores de ${hpPerAerator} HP:</strong> ${numAerators} unidades</li>
+                    <li><strong>Distribución:</strong> Se ha generado un patrón de flujo circular (Racetrack) para maximizar la circulación y concentrar los residuos en el centro.</li>
+                </ul>
+            `;
+        }
+
+        function createAerator(container, topPercent, leftPercent, number) {
+            const aerator = document.createElement('div');
+            aerator.className = 'aerator';
+            aerator.style.top = `${topPercent}%`;
+            aerator.style.left = `${leftPercent}%`;
+            aerator.innerHTML = `
+                ${number}
+                <span class="tooltip">
+                    Dist. pared larga: ${(document.getElementById('width').value * 0.20).toFixed(1)}m<br>
+                    Dist. pared corta: variable
+                </span>
+            `;
+            container.appendChild(aerator);
+        }
+
+        function addLabel(container, text, top, left, isHorizontal) {
+            const label = document.createElement('div');
+            label.className = 'dimension-label';
+            label.textContent = text;
+            label.style.top = top;
+            label.style.left = left;
+            if (!isHorizontal) {
+                label.style.transform = 'translate(-50%, -50%) rotate(-90deg)';
+            } else {
+                 label.style.transform = 'translateX(-50%)';
+            }
+            container.appendChild(label);
+        }
+
+        // Ejecutar cálculo al cargar la página con valores iniciales
+        window.onload = calculate;
+
+    </script>
+
+</body>
+</html>
