@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Optimizador de Aireación v6.0 (Ingeniería)</title>
+    <title>Optimizador de Aireación v7.0 (Limpia)</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f4f8; color: #333; display: flex; justify-content: center; align-items: flex-start; padding: 20px; gap: 20px; }
         .container { display: flex; flex-wrap: wrap; gap: 30px; width: 100%; max-width: 1200px; }
@@ -11,45 +11,34 @@
         .config-panel { flex-basis: 350px; flex-shrink: 0; flex-grow: 1; }
         .results-panel { flex-basis: 500px; flex-grow: 2; }
         h1, h2 { color: #005f73; border-bottom: 2px solid #005f73; padding-bottom: 10px; }
+        h3 { color: #0077b6; margin-top: 25px; border-bottom: 1px solid #ade8f4; padding-bottom: 5px;}
         .form-group { margin-bottom: 20px; }
         label { display: block; font-weight: 600; margin-bottom: 8px; }
         input[type="number"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 1em; }
         button { width: 100%; padding: 12px; background-color: #0a9396; color: white; border: none; border-radius: 4px; font-size: 1.1em; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
         button:hover { background-color: #005f73; }
-        #pool-container { position: relative; background-color: #e0f7fa; border: 2px solid #0077b6; margin-top: 20px; overflow: hidden; }
+        #pool-container { position: relative; background-color: #e0f7fa; border: 2px solid #0077b6; margin-top: 20px; overflow: hidden; display: grid; }
         .aerator {
-            position: absolute;
-            background-color: #6c757d; /* Color base del aireador */
+            background-color: #6c757d;
             border: 1px solid #343a40;
             box-sizing: border-box;
-            transform: translate(-50%, -50%); /* Centrar el elemento */
+            width: 70%;
+            height: 70%;
+            margin: auto;
             display: flex;
             justify-content: center;
             align-items: center;
         }
-        .aerator-paddles {
-            background-color: #ee9b00; /* Color de las paletas */
-            width: 50%;
-            height: 100%;
-        }
-        .dimension-label {
-            position: absolute;
-            color: #d90429;
-            font-size: 12px;
-            font-weight: bold;
-            background-color: rgba(255, 255, 255, 0.7);
-            padding: 1px 4px;
-            border-radius: 3px;
-            white-space: nowrap;
-        }
-        #summary ul { list-style: none; padding: 0; }
-        #summary li { background-color: #f8f9fa; border-left: 4px solid #0a9396; padding: 10px; margin-bottom: 8px; }
+        .aerator-paddles { background-color: #ee9b00; width: 100%; height: 50%;}
+        #summary ul, #dimensions-summary ul { list-style: none; padding: 0; }
+        #summary li, #dimensions-summary li { background-color: #f8f9fa; border-left: 4px solid #0a9396; padding: 10px; margin-bottom: 8px; }
+        #dimensions-summary li { border-left-color: #d90429; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="panel config-panel">
-            <h1>Optimizador de Aireación 🦐 v6.0</h1>
+            <h1>Optimizador de Aireación 🦐 v7.0</h1>
             <div id="config-form">
                 <div class="form-group"><label for="length">Largo (mts):</label><input type="number" id="length" value="400"></div>
                 <div class="form-group"><label for="width">Ancho (mts):</label><input type="number" id="width" value="100"></div>
@@ -62,6 +51,7 @@
             <h2>Resultados de Simulación</h2>
             <div id="pool-container"></div>
             <div id="summary"></div>
+            <div id="dimensions-summary"></div>
         </div>
     </div>
 
@@ -86,45 +76,36 @@
             const rows = grid.rows;
             const cols = grid.cols;
 
-            // --- LÓGICA DE VISUALIZACIÓN (Nueva en V6.0) ---
+            // --- LÓGICA DE VISUALIZACIÓN (Revertida a CSS Grid) ---
             const poolContainer = document.getElementById('pool-container');
             poolContainer.innerHTML = '';
             
+            poolContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+            poolContainer.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+            
             const aspectRatio = width / length;
             const containerWidth = poolContainer.parentElement.clientWidth > 500 ? 500 : poolContainer.parentElement.clientWidth - 40;
-            const displayWidth = containerWidth;
-            const displayHeight = containerWidth * aspectRatio;
+            poolContainer.style.width = `${containerWidth}px`;
+            poolContainer.style.height = `${containerWidth * aspectRatio}px`;
 
-            poolContainer.style.width = `${displayWidth}px`;
-            poolContainer.style.height = `${displayHeight}px`;
+            // Orientar el aireador (largo de 4m con el lado largo de la celda)
+            const cellAspectRatio = (length / cols) / (width / rows);
+            const aerator_w_percent = (cellAspectRatio > 1) ? "70%" : "50%";
+            const aerator_h_percent = (cellAspectRatio > 1) ? "50%" : "70%";
 
-            const px_per_meter = displayWidth / length;
-            const aerator_real_w = 4; // 4 metros
-            const aerator_real_h = 2; // 2 metros
-            const aerator_w_px = aerator_real_w * px_per_meter;
-            const aerator_h_px = aerator_real_h * px_per_meter;
-
-            const cell_w_px = displayWidth / cols;
-            const cell_h_px = displayHeight / rows;
-
-            // Dibujar Aireadores
-            for (let r = 0; r < rows; r++) {
-                for (let c = 0; c < cols; c++) {
-                    const centerX = (c + 0.5) * cell_w_px;
-                    const centerY = (r + 0.5) * cell_h_px;
-                    createAerator(poolContainer, centerX, centerY, aerator_w_px, aerator_h_px);
-                }
+            for (let i = 0; i < finalNumAerators; i++) {
+                const aerator = document.createElement('div');
+                aerator.className = 'aerator';
+                aerator.style.width = aerator_w_percent;
+                aerator.style.height = aerator_h_percent;
+                aerator.innerHTML = `<div class="aerator-paddles"></div>`;
+                poolContainer.appendChild(aerator);
             }
-
-            // Dibujar Acotaciones de Distancia
-            const cell_w_m = length / cols;
-            const cell_h_m = width / rows;
-            drawDimensions(poolContainer, cell_w_px, cell_h_px, cell_w_m, cell_h_m, cols, rows);
-
-            // --- MOSTRAR RESUMEN ---
+            
+            // --- RESUMEN TÉCNICO ---
             const summaryDiv = document.getElementById('summary');
             summaryDiv.innerHTML = `
-                <h2>Resumen Técnico (v6.0)</h2>
+                <h3>Resumen Técnico</h3>
                 <ul>
                     <li><strong>Estrategia Aplicada:</strong> Cuadrícula Adaptativa</li>
                     <li><strong>Cálculo por Biomasa:</strong> ${numAeratorsRaw} aireadores</li>
@@ -132,47 +113,20 @@
                     <li><strong>Distribución en Cuadrícula:</strong> ${rows} filas x ${cols} columnas</li>
                 </ul>
             `;
-        }
-        
-        function createAerator(container, left, top, width, height) {
-            const aerator = document.createElement('div');
-            aerator.className = 'aerator';
-            aerator.style.left = `${left}px`;
-            aerator.style.top = `${top}px`;
-            aerator.style.width = `${width}px`;
-            aerator.style.height = `${height}px`;
-            aerator.innerHTML = `<div class="aerator-paddles"></div>`;
-            container.appendChild(aerator);
-        }
 
-        function drawDimensions(container, cell_w_px, cell_h_px, cell_w_m, cell_h_m, cols, rows) {
-            // Distancia: Pared al Aireador (Horizontal)
-            createLabel(container, `↔ ${ (cell_w_m / 2).toFixed(1) }m`, cell_w_px * 0.25, cell_h_px * 0.5 - 15);
-            // Distancia: Pared al Aireador (Vertical)
-            createLabel(container, `↕ ${ (cell_h_m / 2).toFixed(1) }m`, cell_w_px * 0.5 - 20, cell_h_px * 0.25, true);
-
-            // Distancia: Entre Aireadores (Horizontal)
-            if (cols > 1) {
-                createLabel(container, `↔ ${ cell_w_m.toFixed(1) }m`, cell_w_px, cell_h_px * 0.5 - 15);
-            }
-            // Distancia: Entre Aireadores (Vertical)
-            if (rows > 1) {
-                createLabel(container, `↕ ${ cell_h_m.toFixed(1) }m`, cell_w_px * 0.5 - 20, cell_h_px, true);
-            }
-        }
-        
-        function createLabel(container, text, left, top, isVertical = false) {
-            const label = document.createElement('div');
-            label.className = 'dimension-label';
-            label.innerHTML = text;
-            label.style.left = `${left}px`;
-            label.style.top = `${top}px`;
-            if (isVertical) {
-                label.style.transform = 'translate(-50%, -50%) rotate(90deg)';
-            } else {
-                label.style.transform = 'translate(-50%, -50%)';
-            }
-            container.appendChild(label);
+            // --- NUEVA SECCIÓN: ACOTACIONES DE DISTANCIA ---
+            const dimensionsDiv = document.getElementById('dimensions-summary');
+            const cell_w_m = length / cols;
+            const cell_h_m = width / rows;
+            dimensionsDiv.innerHTML = `
+                <h3>Acotaciones de Distancia</h3>
+                <ul>
+                    <li><strong>Distancia (Pared Larga al Aireador):</strong> ${(cell_h_m / 2).toFixed(1)} mts</li>
+                    <li><strong>Distancia (Pared Corta al Aireador):</strong> ${(cell_w_m / 2).toFixed(1)} mts</li>
+                    ${cols > 1 ? `<li><strong>Distancia entre Aireadores (Eje Largo):</strong> ${cell_w_m.toFixed(1)} mts</li>` : ''}
+                    ${rows > 1 ? `<li><strong>Distancia entre Aireadores (Eje Corto):</strong> ${cell_h_m.toFixed(1)} mts</li>` : ''}
+                </ul>
+            `;
         }
 
         function findBestGrid(targetCount, poolW, poolL) {
