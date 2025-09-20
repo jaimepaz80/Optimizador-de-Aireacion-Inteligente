@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Optimizador de Aireación v5.0 (Adaptativa)</title>
+    <title>Optimizador de Aireación v6.0 (Ingeniería)</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f4f8; color: #333; display: flex; justify-content: center; align-items: flex-start; padding: 20px; gap: 20px; }
         .container { display: flex; flex-wrap: wrap; gap: 30px; width: 100%; max-width: 1200px; }
@@ -16,22 +16,45 @@
         input[type="number"] { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 1em; }
         button { width: 100%; padding: 12px; background-color: #0a9396; color: white; border: none; border-radius: 4px; font-size: 1.1em; font-weight: bold; cursor: pointer; transition: background-color 0.3s; }
         button:hover { background-color: #005f73; }
-        #pool-container { position: relative; background-color: #e0f7fa; border: 2px solid #0077b6; margin-top: 20px; overflow: hidden; display: grid; }
-        .aerator { background-color: #ee9b00; border: 1px solid #9b2226; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 12px; font-weight: bold; width: 60%; height: 60%; margin: auto; }
+        #pool-container { position: relative; background-color: #e0f7fa; border: 2px solid #0077b6; margin-top: 20px; overflow: hidden; }
+        .aerator {
+            position: absolute;
+            background-color: #6c757d; /* Color base del aireador */
+            border: 1px solid #343a40;
+            box-sizing: border-box;
+            transform: translate(-50%, -50%); /* Centrar el elemento */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .aerator-paddles {
+            background-color: #ee9b00; /* Color de las paletas */
+            width: 50%;
+            height: 100%;
+        }
+        .dimension-label {
+            position: absolute;
+            color: #d90429;
+            font-size: 12px;
+            font-weight: bold;
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 1px 4px;
+            border-radius: 3px;
+            white-space: nowrap;
+        }
         #summary ul { list-style: none; padding: 0; }
         #summary li { background-color: #f8f9fa; border-left: 4px solid #0a9396; padding: 10px; margin-bottom: 8px; }
-        .strategy-title { color: #d90429; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="panel config-panel">
-            <h1>Optimizador de Aireación 🦐 v5.0</h1>
+            <h1>Optimizador de Aireación 🦐 v6.0</h1>
             <div id="config-form">
                 <div class="form-group"><label for="length">Largo (mts):</label><input type="number" id="length" value="400"></div>
                 <div class="form-group"><label for="width">Ancho (mts):</label><input type="number" id="width" value="100"></div>
                 <div class="form-group"><label for="biomass">Biomasa Máxima (kg):</label><input type="number" id="biomass" value="12000"></div>
-                <div class="form-group"><label for="hp">Potencia por Aireador (HP):</label><input type="number" id="hp" value="4"></div>
+                <div class="form-group"><label for="hp">Potencia por Aireador (HP):</label><input type="number" id="hp" value="8"></div>
                 <button onclick="calculate()">Calcular Distribución Óptima</button>
             </div>
         </div>
@@ -44,7 +67,7 @@
 
     <script>
         function calculate() {
-            // 1. OBTENER DATOS
+            // --- LÓGICA DE CÁLCULO (Igual a V5.0) ---
             const length = parseFloat(document.getElementById('length').value);
             const width = parseFloat(document.getElementById('width').value);
             const biomass = parseFloat(document.getElementById('biomass').value);
@@ -54,82 +77,123 @@
                 alert("Por favor, introduce valores válidos."); return;
             }
 
-            // --- LÓGICA V5.0 ---
             const KG_PER_HP = 180;
-
-            // 2. CÁLCULO DE N° DE AIREADORES EXCLUSIVAMENTE POR BIOMASA
             const totalHpNeeded = biomass / KG_PER_HP;
             const numAeratorsRaw = Math.ceil(totalHpNeeded / hpPerAerator);
-
-            // 3. AJUSTE A NÚMERO PAR SUPERIOR
-            const finalNumAerators = (numAeratorsRaw % 2 !== 0) ? numAeratorsRaw + 1 : numAeratorsRaw;
+            const finalNumAerators = (numAeratorsRaw % 2 !== 0 && numAeratorsRaw > 1) ? numAeratorsRaw + 1 : numAeratorsRaw;
             
-            // 4. ENCONTRAR LA MEJOR CUADRÍCULA (filas x columnas)
             const grid = findBestGrid(finalNumAerators, width, length);
             const rows = grid.rows;
             const cols = grid.cols;
 
-            // 5. VISUALIZACIÓN
+            // --- LÓGICA DE VISUALIZACIÓN (Nueva en V6.0) ---
             const poolContainer = document.getElementById('pool-container');
             poolContainer.innerHTML = '';
             
-            poolContainer.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-            poolContainer.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
-            
             const aspectRatio = width / length;
-            const containerWidth = poolContainer.parentElement.clientWidth - 40;
-            poolContainer.style.width = `${containerWidth}px`;
-            poolContainer.style.height = `${containerWidth * aspectRatio}px`;
+            const containerWidth = poolContainer.parentElement.clientWidth > 500 ? 500 : poolContainer.parentElement.clientWidth - 40;
+            const displayWidth = containerWidth;
+            const displayHeight = containerWidth * aspectRatio;
 
-            for (let i = 0; i < finalNumAerators; i++) {
-                const aerator = document.createElement('div');
-                aerator.className = 'aerator';
-                poolContainer.appendChild(aerator);
+            poolContainer.style.width = `${displayWidth}px`;
+            poolContainer.style.height = `${displayHeight}px`;
+
+            const px_per_meter = displayWidth / length;
+            const aerator_real_w = 4; // 4 metros
+            const aerator_real_h = 2; // 2 metros
+            const aerator_w_px = aerator_real_w * px_per_meter;
+            const aerator_h_px = aerator_real_h * px_per_meter;
+
+            const cell_w_px = displayWidth / cols;
+            const cell_h_px = displayHeight / rows;
+
+            // Dibujar Aireadores
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const centerX = (c + 0.5) * cell_w_px;
+                    const centerY = (r + 0.5) * cell_h_px;
+                    createAerator(poolContainer, centerX, centerY, aerator_w_px, aerator_h_px);
+                }
             }
-            
-            // 6. MOSTRAR RESUMEN
-            const areaPerAerator = (length * width) / finalNumAerators;
+
+            // Dibujar Acotaciones de Distancia
+            const cell_w_m = length / cols;
+            const cell_h_m = width / rows;
+            drawDimensions(poolContainer, cell_w_px, cell_h_px, cell_w_m, cell_h_m, cols, rows);
+
+            // --- MOSTRAR RESUMEN ---
             const summaryDiv = document.getElementById('summary');
             summaryDiv.innerHTML = `
-                <h2>Resumen Técnico (v5.0)</h2>
+                <h2>Resumen Técnico (v6.0)</h2>
                 <ul>
-                    <li><span class="strategy-title">Estrategia Aplicada:</span> Cuadrícula Adaptativa</li>
+                    <li><strong>Estrategia Aplicada:</strong> Cuadrícula Adaptativa</li>
                     <li><strong>Cálculo por Biomasa:</strong> ${numAeratorsRaw} aireadores</li>
                     <li style="font-weight: bold; background-color: #e0f7fa;"><strong>Ajuste a Par Superior:</strong> ${finalNumAerators} aireadores</li>
                     <li><strong>Distribución en Cuadrícula:</strong> ${rows} filas x ${cols} columnas</li>
-                    <li><strong>Área de cobertura por aireador:</strong> ${areaPerAerator.toFixed(2)} m²</li>
                 </ul>
             `;
         }
+        
+        function createAerator(container, left, top, width, height) {
+            const aerator = document.createElement('div');
+            aerator.className = 'aerator';
+            aerator.style.left = `${left}px`;
+            aerator.style.top = `${top}px`;
+            aerator.style.width = `${width}px`;
+            aerator.style.height = `${height}px`;
+            aerator.innerHTML = `<div class="aerator-paddles"></div>`;
+            container.appendChild(aerator);
+        }
+
+        function drawDimensions(container, cell_w_px, cell_h_px, cell_w_m, cell_h_m, cols, rows) {
+            // Distancia: Pared al Aireador (Horizontal)
+            createLabel(container, `↔ ${ (cell_w_m / 2).toFixed(1) }m`, cell_w_px * 0.25, cell_h_px * 0.5 - 15);
+            // Distancia: Pared al Aireador (Vertical)
+            createLabel(container, `↕ ${ (cell_h_m / 2).toFixed(1) }m`, cell_w_px * 0.5 - 20, cell_h_px * 0.25, true);
+
+            // Distancia: Entre Aireadores (Horizontal)
+            if (cols > 1) {
+                createLabel(container, `↔ ${ cell_w_m.toFixed(1) }m`, cell_w_px, cell_h_px * 0.5 - 15);
+            }
+            // Distancia: Entre Aireadores (Vertical)
+            if (rows > 1) {
+                createLabel(container, `↕ ${ cell_h_m.toFixed(1) }m`, cell_w_px * 0.5 - 20, cell_h_px, true);
+            }
+        }
+        
+        function createLabel(container, text, left, top, isVertical = false) {
+            const label = document.createElement('div');
+            label.className = 'dimension-label';
+            label.innerHTML = text;
+            label.style.left = `${left}px`;
+            label.style.top = `${top}px`;
+            if (isVertical) {
+                label.style.transform = 'translate(-50%, -50%) rotate(90deg)';
+            } else {
+                label.style.transform = 'translate(-50%, -50%)';
+            }
+            container.appendChild(label);
+        }
 
         function findBestGrid(targetCount, poolW, poolL) {
+            // Lógica sin cambios de V5.0
+            if (targetCount === 0) return {rows: 0, cols: 0};
             let bestGrid = { rows: 1, cols: targetCount };
             let minRatioDiff = Infinity;
 
             for (let i = 1; i <= Math.sqrt(targetCount); i++) {
                 if (targetCount % i === 0) {
                     const j = targetCount / i;
-                    // Probar combinación 1: (i rows, j cols)
-                    let cellW1 = poolL / j;
-                    let cellH1 = poolW / i;
-                    let ratio1 = cellW1 / cellH1;
-                    let diff1 = Math.abs(1 - ratio1);
-
-                    if (diff1 < minRatioDiff) {
-                        minRatioDiff = diff1;
-                        bestGrid = { rows: i, cols: j };
-                    }
-                    
-                    // Probar combinación 2: (j rows, i cols)
-                    let cellW2 = poolL / i;
-                    let cellH2 = poolW / j;
-                    let ratio2 = cellW2 / cellH2;
-                    let diff2 = Math.abs(1 - ratio2);
-
-                    if (diff2 < minRatioDiff) {
-                        minRatioDiff = diff2;
-                        bestGrid = { rows: j, cols: i };
-                    }
+                    [[i, j], [j, i]].forEach(([r, c]) => {
+                        let cellW = poolL / c;
+                        let cellH = poolW / r;
+                        let ratio = cellW / cellH;
+                        let diff = Math.abs(1 - ratio);
+                        if (diff < minRatioDiff) {
+                            minRatioDiff = diff;
+                            bestGrid = { rows: r, cols: c };
+                        }
+                    });
                 }
             }
             return bestGrid;
